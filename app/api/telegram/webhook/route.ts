@@ -6,7 +6,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzeMessage } from "@/lib/conflictAnalyzer";
 import { addAlert } from "@/lib/alertsStore";
 import { notifyManagers } from "@/lib/notifications";
-import { config } from "@/lib/config";
 
 interface TelegramMessage {
   message_id: number;
@@ -49,6 +48,11 @@ export async function POST(request: NextRequest) {
     const chat = message.chat;
 
     const analysis = analyzeMessage(text);
+
+    console.log("[ConflictGuard] Analysis debug", {
+      text,
+      analysis,
+    });
 
     const alert = addAlert({
       chatId: chat.id,

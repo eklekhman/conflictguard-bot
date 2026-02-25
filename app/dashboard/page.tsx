@@ -1,5 +1,6 @@
-"use client";
+ "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { RiskLevel } from "@/lib/conflictAnalyzer";
 
@@ -60,12 +61,12 @@ export default function DashboardPage() {
               Алерты по риску конфликта в чатах
             </p>
           </div>
-          <a
+          <Link
             href="/"
             className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline"
           >
             На главную
-          </a>
+          </Link>
         </div>
       </header>
 
