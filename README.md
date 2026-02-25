@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ConflictGuard
 
-## Getting Started
+Telegram-бот для анализа тона сообщений в чатах в реальном времени: оценивает уровень вежливости/риска конфликта и отправляет **приватные алерты менеджерам**, когда риск растёт до эскалации.
 
-First, run the development server:
+Стек: **Next.js** (App Router, TypeScript).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Возможности
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Приём сообщений из Telegram через **Webhook**
+- Анализ текста по словарям «острых» и «смягчающих» слов → `riskScore` (0–100) и `riskLevel` (LOW / MEDIUM / HIGH)
+- При **HIGH** — отправка приватного уведомления каждому менеджеру с текстом сообщения и рекомендацией
+- **Панель** `/dashboard`: список последних алертов и фильтр по уровню риска
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Быстрый старт
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Установка зависимостей уже выполнена (`npm install`).
 
-## Learn More
+2. Скопируйте переменные окружения:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Заполните в `.env.local`:
+   - `TELEGRAM_BOT_TOKEN` — токен от [@BotFather](https://t.me/BotFather)
+   - `MANAGER_IDS` — ID пользователей Telegram менеджеров через запятую (например, `12345,67890`). Узнать свой ID можно через [@userinfobot](https://t.me/userinfobot).
 
-To learn more about Next.js, take a look at the following resources:
+3. Запуск:
+   ```bash
+   npm run dev
+   ```
+   Откройте [http://localhost:3000](http://localhost:3000). Панель алертов: [http://localhost:3000/dashboard](http://localhost:3000/dashboard).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Настройка Webhook (нужен публичный HTTPS-URL):
+   - Локально: например, [ngrok](https://ngrok.com): `ngrok http 3000`, затем подставьте `https://ВАШ_ДОМЕН/api/telegram/webhook`.
+   - Установка webhook (один раз):
+     ```bash
+     curl "https://api.telegram.org/bot<ВАШ_ТОКЕН>/setWebhook?url=https://ВАШ_ДОМЕН/api/telegram/webhook"
+     ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. Добавьте бота в тестовый чат и отправьте сообщения. «Острые» фразы (из словаря в `lib/conflictAnalyzer.ts`) поднимут риск; при HIGH менеджеры получат личное сообщение от бота.
 
-## Deploy on Vercel
+## Структура проекта
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `app/api/telegram/webhook/route.ts` — приём обновлений от Telegram
+- `app/api/alerts/route.ts` — API для панели (список алертов)
+- `lib/conflictAnalyzer.ts` — анализ текста, riskScore / riskLevel
+- `lib/notifications.ts` — отправка приватных сообщений менеджерам
+- `lib/alertsStore.ts` — in-memory хранилище алертов
+- `lib/config.ts` — конфиг из env (токен, MANAGER_IDS)
+- `app/dashboard/page.tsx` — страница мониторинга алертов
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Критерии приёмки
+
+- Бот получает сообщения чата через Webhook и обрабатывает их в Next.js
+- Анализатор классифицирует сообщения по LOW / MEDIUM / HIGH
+- При HIGH бот отправляет приватный алерт хотя бы одному менеджеру
+- `/dashboard` показывает последние алерты и фильтр по уровню риска
+- Код разбит по модулям, типы TypeScript
+
+## Дополнительно (по желанию)
+
+- БД (SQLite + Prisma) для хранения алертов
+- Авторизация на `/dashboard`
+- Учёт контекста (серия сообщений, частота конфликтов от автора)
+- Разные тексты рекомендаций в зависимости от riskLevel
