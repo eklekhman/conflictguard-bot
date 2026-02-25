@@ -98,7 +98,7 @@ const HIGH_THRESHOLD = 55;
 const MEDIUM_THRESHOLD = 25;
 
 function normalizeText(text: string): string {
-  return text.toLowerCase().trim();
+  return text.toLocaleLowerCase("ru-RU").trim();
 }
 
 function countMatches(text: string, words: string[]): number {
@@ -106,10 +106,8 @@ function countMatches(text: string, words: string[]): number {
   let count = 0;
 
   for (const w of words) {
-    const term = w.toLowerCase().trim();
+    const term = w.toLocaleLowerCase("ru-RU").trim();
     if (!term) continue;
-
-    // Простой contains для русских/английских слов и фраз
     if (normalized.includes(term)) {
       count += 1;
     }
@@ -123,7 +121,7 @@ function extractMatchedTerms(text: string, words: string[]): string[] {
   const tokens = normalized.match(/\p{L}+/gu) ?? [];
   const tokenSet = new Set(tokens);
 
-  const uniqueTerms = Array.from(new Set(words.map((w) => w.toLowerCase().trim()).filter(Boolean)));
+  const uniqueTerms = Array.from(new Set(words.map((w) => w.toLocaleLowerCase("ru-RU").trim()).filter(Boolean)));
   const result = new Set<string>();
 
   for (const term of uniqueTerms) {
