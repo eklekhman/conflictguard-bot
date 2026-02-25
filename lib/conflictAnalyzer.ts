@@ -103,25 +103,16 @@ function normalizeText(text: string): string {
 
 function countMatches(text: string, words: string[]): number {
   const normalized = normalizeText(text);
-
-  // Tokenize words using Unicode letter sequences (works for Cyrillic, Latin, etc.)
-  const tokens = normalized.match(/\p{L}+/gu) ?? [];
-  const tokenCounts = new Map<string, number>();
-  for (const t of tokens) {
-    tokenCounts.set(t, (tokenCounts.get(t) ?? 0) + 1);
-  }
-
-  const uniqueTerms = Array.from(new Set(words.map((w) => w.toLowerCase().trim()).filter(Boolean)));
-
   let count = 0;
-  for (const term of uniqueTerms) {
-    // Multi-word phrases: substring match in the normalized text.
-    if (term.includes(" ")) {
-      if (normalized.includes(term)) count += 1;
-      continue;
-    }
 
-    count += tokenCounts.get(term) ?? 0;
+  for (const w of words) {
+    const term = w.toLowerCase().trim();
+    if (!term) continue;
+
+    // Простой contains для русских/английских слов и фраз
+    if (normalized.includes(term)) {
+      count += 1;
+    }
   }
 
   return count;
