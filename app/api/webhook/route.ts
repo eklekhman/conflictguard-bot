@@ -19,11 +19,13 @@ const MAT_SCORE: { [key: string]: number } = {
   пиздец: 80, блять: 70, хуй: 85,
   нахуй: 95, "пошел нахуй": 100,
   конфликт: 30, война: 40, драка: 50,
-  убью: 90, зарежу: 95, заебал: 75
+  убью: 90, зарежу: 95, заебал: 75,
+  пизда: 75, урод: 45, мразь: 60, тварь: 55
 };
 
 function analyzeConflict(text: string, chatId: number): { 
   score: number; 
+  rawScore: number;
   risk: string; 
   words: string[]; 
   matCount: number 
@@ -33,10 +35,10 @@ function analyzeConflict(text: string, chatId: number): {
   const foundWords: string[] = [];
   let matCount = 0;
 
-  // 🔥 ПРОСТЫЙ .includes() + защита от подстрок БЕЗ regex!
+  // 🔥 ЛОВИМ ВСЕ слова БЕЗ break!
   for (const [badWord, points] of Object.entries(MAT_SCORE)) {
     if (lower.includes(badWord)) {
-      // ✅ ПРОВЕРКА: нет ли более длинного слова внутри этого?
+      // ✅ Защита от подстрок (дура НЕ засчитывается в дурак)
       let skipWord = false;
       for (const [longerWord] of Object.entries(MAT_SCORE)) {
         if (longerWord.length > badWord.length && 
@@ -47,7 +49,6 @@ function analyzeConflict(text: string, chatId: number): {
         }
       }
       
-      // ✅ Если НЕТ более длинного - засчитываем!
       if (!skipWord) {
         rawScore += points;
         foundWords.push(`${badWord}×1`);
@@ -56,6 +57,7 @@ function analyzeConflict(text: string, chatId: number): {
     }
   }
 
+  // 🎁 Бонусы
   let bonusScore = 0;
   if (rawScore > 0) {
     bonusScore = (text.match(/[А-ЯЪЫЬЭЁ]{3,}/g) || []).length * 10 + 
@@ -63,13 +65,13 @@ function analyzeConflict(text: string, chatId: number): {
   }
 
   const finalScore = Math.min(rawScore + bonusScore, 100);
-  console.log(`🔍 "${text}" → ${finalScore}% (${foundWords.join(', ') || 'clean'})`);
+  console.log(`🔍 "${text}" → ${finalScore}% (${Math.round(rawScore + bonusScore)}/${Math.round(finalScore)}%) (${foundWords.join(', ') || 'clean'})`);
 
   const risk = finalScore > 80 ? "🔥 HIGH" : 
                finalScore > 50 ? "🚨 MEDIUM" : 
                finalScore > 25 ? "⚠️ LOW" : "✅ OK";
   
-  return { score: finalScore, risk, words: foundWords, matCount };
+  return { score: finalScore, rawScore: rawScore + bonusScore, risk, words: foundWords, matCount };
 }
 
 export async function POST(request: NextRequest) {
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
     console.log(`👤 ${user} [${chatId}]: "${text}"`);
 
     if (text) {
-      const { score, risk, words, matCount } = analyzeConflict(text, chatId);
+      const { score, rawScore, risk, words, matCount } = analyzeConflict(text, chatId);
       
       try {
         addStat(words.join(', ') || text.slice(0, 30), score);
@@ -97,8 +99,9 @@ export async function POST(request: NextRequest) {
         console.log('⚠️ addStat:', (e as Error).message);
       }
 
+      // 🔥 УВЕДОМЛЕНИЕ при риске >25%
       if (score > 25 && words.length > 0) {
-        console.log(`⚡ АЛАРМ ${risk}! ${score}% (${words.join(', ')})`);
+        console.log(`⚡ АЛАРМ ${risk}! ${score}% (${Math.round(rawScore)}/${Math.round(score)}%) (${words.join(', ')})`);
         
         const ADMIN_CHAT_ID = Number(process.env.TELEGRAM_CHAT_ID || "0");
         const token = process.env.TELEGRAM_TOKEN;
@@ -110,12 +113,13 @@ export async function POST(request: NextRequest) {
         
         const emoji = score > 80 ? "🔥" : score > 50 ? "🚨" : "⚠️";
         
+        // ✅ БАЛЛЫ + ПРОЦЕНТ: 120/100%
         await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: ADMIN_CHAT_ID,
-            text: `${emoji} CONFLICTGUARD | ${risk}\n👤 ${user}\n💬 "${text}"\n⚡ ${Math.round(score)}% | ${words.join(', ')}`
+            text: `${emoji} CONFLICTGUARD | ${risk}\n👤 ${user}\n💬 "${text}"\n⚡ ${Math.round(rawScore)}/${Math.round(score)}% | ${words.join(', ')}`
           })
         }).catch(err => console.error('❌ Уведомление:', err));
       } else {
