@@ -9,148 +9,156 @@ if (!global.chatHistory) {
   global.chatHistory = new Map();
 }
 
-const MAT_SCORE: { [key: string]: number } = {
-  дебил: 40, дебильный: 40, дебилизм: 40,
-  кретин: 45, кретинизм: 45, 
-  дурак: 25, дурацкий: 25,
-  идиот: 50, идиотизм: 50,
-  мудак: 60, мудаковатый: 60,
-  сука: 65, пизда: 75,
-  пиздец: 80, блять: 70, хуй: 85,
-  нахуй: 95,
-  конфликт: 30, война: 40, драка: 50,
-  убью: 90, зарежу: 95, заебал: 75,
-  урод: 45, мразь: 60, тварь: 55
+const BAD_WORDS: { [key: string]: number } = {
+  // 🔥 МАТ (высокий риск)
+  "хуй": 85, "блять": 70, "блядь": 70, "пиздец": 80, "сука": 65,
+  "пизда": 75, "нахуй": 95, "мудак": 60, "заебал": 75, "ебать": 80,
+  
+  // ⚠️ ОСКОРБЛЕНИЯ (15-55 баллов)
+  "дурак": 25, "дура": 20, "тупой": 30, "тупая": 30, "дебил": 40,
+  "идиот": 50, "кретин": 45, "урод": 40, "козел": 35, "тварь": 55,
+  "мразь": 60, "сволочь": 50, "чмо": 50, "придурок": 40,
+  
+  // ☠️ УГРОЗЫ (высокий риск)
+  "убью": 90, "зарежу": 95, "задушу": 85, "изобью": 80,
+  
+  // ⚔️ КОНФЛИКТЫ
+  "драка": 35, "война": 40, "бойня": 50
 };
 
-function analyzeConflict(text: string, chatId: number): { 
-  score: number; 
-  rawScore: number;
-  risk: string; 
-  words: string[]; 
-  matCount: number 
-} {
-  const lower = text.toLowerCase();
-  let rawScore = 0;
-  const foundWords: string[] = [];
-  let matCount = 0;
+function tokenize(text: string): string[] {
+  const lowered = text.toLowerCase();
+  const words: string[] = [];
+  let currentWord = "";
+  
+  for (let i = 0; i < lowered.length; i++) {
+    const char = lowered[i];
+    const code = char.charCodeAt(0);
+    
+    // русские буквы + ё + цифры
+    if ((code >= 1072 && code <= 1103) || char === "ё" || 
+        (code >= 48 && code <= 57)) {
+      currentWord += char;
+    } else if (currentWord) {
+      words.push(currentWord);
+      currentWord = "";
+    }
+  }
+  if (currentWord) words.push(currentWord);
+  
+  return words;
+}
 
-  // 🔥 ПРОСТОЙ .includes() БЕЗ regex - ЛОВИМ ВСЕ!
-  for (const [badWord, points] of Object.entries(MAT_SCORE)) {
-    if (lower.includes(badWord)) {
-      // ✅ Лёгкая защита: пропускаем только если ТОЧНО короче И внутри другого
-      const isSubstring = Object.entries(MAT_SCORE).some(([longerWord, longerPoints]) => 
-        longerWord.length > badWord.length + 1 && // Минимум на 2 буквы длиннее
-        longerWord.includes(badWord) && 
-        lower.includes(longerWord)
-      );
+function analyzeConflict(text: string): {
+  score: number; rawScore: number; risk: string; words: string[]; matCount: number;
+} {
+  const tokens = tokenize(text);
+  let rawScore = 0;
+  const found: { word: string; points: number; count: number }[] = [];
+
+  for (const token of tokens) {
+    if (BAD_WORDS[token]) {
+      const points = BAD_WORDS[token];
+      rawScore += points;
       
-      if (!isSubstring) {
-        rawScore += points;
-        if (!foundWords.some(w => w.includes(badWord))) {
-          foundWords.push(`${badWord}×1 (${points} баллов)`);
-        }
-        matCount++;
+      const existing = found.find(f => f.word === token);
+      if (existing) {
+        existing.count++;
+      } else {
+        found.push({ word: token, points, count: 1 });
       }
     }
   }
 
-  // Бонусы БЕЗ regex
-  let bonusScore = 0;
-  if (rawScore > 0) {
-    const upperCount = (text.match(/[А-ЯЪЫЬЭЁ]{3,}/g) || []).length;
-    const punctCount = (text.match(/[!]{2,}/g) || []).length;
-    bonusScore = upperCount * 10 + punctCount * 8;
-  }
-
-  const finalScore = Math.min(rawScore + bonusScore, 100);
-  console.log(`🔍 "${text}" → ${finalScore}% (${Math.round(rawScore)}/${Math.round(finalScore)}%) (${foundWords.join(', ') || 'clean'})`);
-
-  const risk = finalScore > 80 ? "🔥 HIGH" : 
-               finalScore > 50 ? "🚨 MEDIUM" : 
-               finalScore > 25 ? "⚠️ LOW" : "✅ OK";
+  const matCount = found.reduce((sum, f) => sum + f.count, 0);
   
-  return { score: finalScore, rawScore: rawScore + bonusScore, risk, words: foundWords, matCount };
+  // бонус за КАПС и знаки
+  let bonus = 0;
+  const upperCount = (text.match(/[А-ЯЁ]{2,}/g) || []).length;
+  const punctCount = (text.match(/[!?.]{2,}/g) || []).length;
+  bonus = upperCount * 10 + punctCount * 8;
+
+  const total = Math.min(rawScore + bonus, 100);
+  const risk = total > 80 ? "🔥 HIGH" : total > 50 ? "🚨 MEDIUM" : 
+               total > 15 ? "⚠️ LOW" : "✅ OK";
+
+  const wordsList = found.map(f => `${f.word}x${f.count}(${f.points})`);
+
+  console.log(`🎯 "${text}" → ${total}% | ${wordsList.join(", ") || "чистый"}`);
+
+  return { score: total, rawScore: rawScore + bonus, risk, words: wordsList, matCount };
 }
 
 export async function POST(request: NextRequest) {
-  console.log("📨 POST /api/webhook");
-
   try {
     const body = await request.json();
-    const chatId = Number(body.message?.chat?.id);
-    const user = body.message?.from?.username || body.message?.from?.first_name || "unknown";
-    const text = body.message?.text || "";
+    const msg = body.message;
+    const chatId = Number(msg?.chat?.id);
+    const user = msg?.from?.username || msg?.from?.first_name || "аноним";
+    const text = msg?.text || "";
 
+    // история чата (последние 20 сообщений)
     if (!global.chatHistory.has(chatId)) global.chatHistory.set(chatId, []);
     const history = global.chatHistory.get(chatId)!;
     history.push({ text, time: Date.now() });
     if (history.length > 20) history.shift();
 
-    console.log(`👤 ${user} [${chatId}]: "${text}"`);
+    console.log(`[${chatId}] ${user}: "${text}"`);
 
     if (text) {
-      const { score, rawScore, risk, words } = analyzeConflict(text, chatId);
+      const analysis = analyzeConflict(text);
       
-      try {
-        addStat(words.join(', ') || text.slice(0, 30), score);
-      } catch (e) {
-        console.log('⚠️ addStat:', e);
-      }
+      // статистика
+      try { addStat(text.slice(0, 50), analysis.score); } 
+      catch (e) { console.log("статистика не сохранилась"); }
 
       const token = process.env.TELEGRAM_TOKEN;
-      if (!token) {
-        console.error("❌ TELEGRAM_TOKEN не найден!");
-        return NextResponse.json({ ok: true });
-      }
+      if (!token) return NextResponse.json({ ok: true });
 
-      // 🔥 ОСНОВНОЕ УВЕДОМЛЕНИЕ (>25%)
-      if (score > 25 && words.length > 0) {
-        console.log(`⚡ АЛАРМ ${risk}! ${score}% (${Math.round(rawScore)}/${Math.round(score)}%)`);
-        
+      // ✅ УВЕДОМЛЕНИЯ >15% в мониторинг
+      if (analysis.score > 15 && analysis.words.length > 0) {
         const MAIN_CHAT_ID = Number(process.env.TELEGRAM_CHAT_ID || "0");
-        const emoji = score > 80 ? "🔥" : score > 50 ? "🚨" : "⚠️";
-        
-        // 1️⃣ ГЛАВНЫЙ ЧАТ
+        const emoji = analysis.score > 80 ? "🔥" : analysis.score > 50 ? "🚨" : "⚠️";
+
         if (MAIN_CHAT_ID) {
+          const alert = `${emoji} ${analysis.risk}\n👤 ${user}\n💬 "${text}"\n⚡ ${Math.round(analysis.rawScore)}% | ${analysis.words.join(", ")}`;
+          
           await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: MAIN_CHAT_ID,
-              text: `${emoji} CONFLICTGUARD | ${risk}\n👤 ${user}\n💬 "${text}"\n⚡ ${Math.round(rawScore)}/${Math.round(score)}% | ${words.join(', ')}`
+              text: alert,
+              parse_mode: "HTML"
             })
-          }).catch(err => console.error('❌ Главный чат:', err));
+          });
         }
 
-        // 2️⃣ АДМИНЫ (>=75%)
-        if (score >= 75) {
-          const adminChatIds = (process.env.ADMIN_CHAT_IDS || "")
-            .split(',')
-            .map(id => Number(id.trim()))
-            .filter(id => id && !isNaN(id));
-          
-          console.log(`🔔 Админам (${adminChatIds.length}): ${adminChatIds.join(', ')}`);
-          
-          for (const adminId of adminChatIds) {
+        // 🚨 АДМИНАМ >75%
+        if (analysis.score >= 75) {
+          const adminIds = (process.env.ADMIN_CHAT_IDS || "")
+            .split(",").map(id => id.trim()).map(Number)
+            .filter(id => !isNaN(id));
+
+          const adminAlert = `🚨 АЛАРМ [${chatId}]\n👤 ${user}\n💬 "${text}"\n⚡ ${Math.round(analysis.rawScore)}% | ${analysis.words.join(", ")}`;
+
+          for (const adminId of adminIds) {
             await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 chat_id: adminId,
-                text: `🚨 [${chatId}] ${risk} АЛАРМ!\n👤 ${user}\n💬 "${text}"\n⚡ ${Math.round(rawScore)}/${Math.round(score)}% | ${words.join(', ')}`
+                text: adminAlert
               })
-            }).catch(err => console.error(`❌ Админ ${adminId}:`, err));
+            });
           }
         }
-      } else {
-        console.log(`✅ OK: ${score}% "${text}" (чистый)`);
       }
     }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("❌ ERROR:", error);
-    return NextResponse.json({ error: "failed" }, { status: 500 });
+    console.error("💥 ОШИБКА:", error);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }
