@@ -40,28 +40,34 @@ function analyzeConflict(text: string, chatId: number): {
   matCount: number 
 } {
   const lower = text.toLowerCase();
-  let totalScore = 0;
   let rawScore = 0;
   const foundWords: string[] = [];
   let matCount = 0;
-
-  for (const [word, points] of Object.entries(MAT_SCORE)) {
-    const count = (lower.match(new RegExp(word, 'gi')) || []).length;
-    if (count > 0) {
-      rawScore += points * count;
-      foundWords.push(`${word}×${count}`);
-      matCount += count;
+  
+  // ✅ ПРОВЕРЯЕМ ОТ ДОЛГИХ К КОРОТКИМ (приоритет нахуй > хуй!)
+  const sortedWords = Object.entries(MAT_SCORE).sort(([,a], [,b]) => b.toString().length - a.toString().length);
+  
+  for (const [word, points] of sortedWords) {
+    // 🔥 ИСКЛЮЧАЕМ дублей: если уже нашли слово содержащее это
+    if (!foundWords.some(w => w.includes(word) || word.includes(w.split('×')[0]))) {
+      const count = (lower.match(new RegExp(word, 'gi')) || []).length;
+      if (count > 0) {
+        rawScore += points * count;
+        foundWords.push(`${word}×${count}`);
+        matCount += count;
+      }
     }
   }
 
+  // 🎁 Бонусы
   let bonusScore = 0;
   if (rawScore > 0) {
     bonusScore = (text.match(/[А-ЯЪЫЬЭЁ]{3,}/g) || []).length * 10 + 
                  (text.match(/[!?.]{2,}/g) || []).length * 8;
   }
 
-  totalScore = Math.min(rawScore + bonusScore, 100);
-  console.log(`🔍 "${text}" → ${totalScore}% (${rawScore + bonusScore}/${totalScore}%) (${foundWords.join(', ') || 'clean'})`);
+  const totalScore = Math.min(rawScore + bonusScore, 100);
+  console.log(`🔍 "${text}" → ${totalScore}% (${Math.round(rawScore + bonusScore)}/${Math.round(totalScore)}%) (${foundWords.join(', ') || 'clean'})`);
 
   const risk = totalScore > 80 ? "🔥 HIGH" : 
                totalScore > 50 ? "🚨 MEDIUM" : 
@@ -96,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (score > 25 && words.length > 0) {
-        console.log(`⚡ АЛАРМ ${risk}! ${score}% (${rawScore}/${score}%)`);
+        console.log(`⚡ АЛАРМ ${risk}! ${score}% (${Math.round(rawScore)}/${Math.round(score)}%)`);
         
         const ADMIN_CHAT_ID = Number(process.env.TELEGRAM_CHAT_ID || "0");
         const token = process.env.TELEGRAM_TOKEN;
@@ -108,7 +114,6 @@ export async function POST(request: NextRequest) {
         
         const emoji = score > 80 ? "🔥" : score > 50 ? "🚨" : "⚠️";
         
-        // ✅ СУММА БАЛЛОВ + ПРОЦЕНТ: 160/100%
         await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
