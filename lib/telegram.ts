@@ -27,6 +27,11 @@ export async function sendManagerAlert(params: {
   score: number;
   risk: RiskLevel;
 }): Promise<void> {
+  // Добавлена проверка: оповещения только от 25 баллов и выше
+  if (params.score < 25) {
+    return;
+  }
+
   const botInstance = getBotInstance();
   if (!botInstance) return;
 
@@ -58,10 +63,16 @@ export async function sendManagerAlert(params: {
   });
 }
 
+// ✅ Новая версия sendRiskSummaryToChat с порогом 25
 export async function sendRiskSummaryToChat(
   chatId: number | string,
   analysis: Pick<AnalysisResult, "score" | "risk" | "reasons">
 ): Promise<void> {
+  // Отправляем только при score >= 25
+  if (analysis.score < 25) {
+    return;
+  }
+
   const botInstance = getBotInstance();
   if (!botInstance) return;
 
@@ -77,5 +88,3 @@ export async function sendRiskSummaryToChat(
 
   await botInstance.sendMessage(chatId, bodyLines.join("\n"));
 }
-
-
