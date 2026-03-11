@@ -22,9 +22,11 @@ const MAT_SCORE: { [key: string]: number } = {
   убью: 90, зарежу: 95, заебал: 75
 };
 
-// 🔥 ИДЕАЛЬНАЯ функция анализа
 function analyzeConflict(text: string, chatId: number): { 
-  score: number; risk: string; word?: string; matCount: number 
+  score: number; 
+  risk: string; 
+  word?: string; 
+  matCount: number 
 } {
   const lower = text.toLowerCase();
   let baseScore = 0;
@@ -41,12 +43,10 @@ function analyzeConflict(text: string, chatId: number): {
     }
   }
 
-  // Подсчет повторов
   if (matchedWord) {
     matCount = (lower.match(new RegExp(matchedWord, 'gi')) || []).length;
   }
 
-  // 🔥 Бонусы ТОЛЬКО при мате
   let bonusScore = 0;
   if (baseScore > 0) {
     bonusScore = (text.match(/[А-ЯЪЫЬЭ]{3,}/g) || []).length * 10 + 
@@ -55,7 +55,7 @@ function analyzeConflict(text: string, chatId: number): {
 
   const finalScore = Math.min(baseScore * matCount + bonusScore, 100);
 
-  console.log(`🔍 "${text}" → ${finalScore}% (${matchedWord || 'clean'} ${baseScore > 0 ? `×${matCount} +${bonusScore}` : ''})`);
+  console.log(`🔍 "${text}" → ${finalScore}% (${matchedWord || 'clean'})`);
 
   const risk = finalScore > 80 ? "🔥 HIGH" : 
                finalScore > 50 ? "🚨 MEDIUM" : 
@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
     const chatId = Number(body.message?.chat?.id);
     const user = body.message?.from?.username || body.message?.from?.first_name || "unknown";
     const text = body.message?.text || "";
-    const messageId = body.message?.message_id;
 
     // История чата
     if (!global.chatHistory.has(chatId)) global.chatHistory.set(chatId, []);
@@ -83,17 +82,17 @@ export async function POST(request: NextRequest) {
     console.log(`👤 ${user} [${chatId}]: "${text}"`);
 
     if (text) {
-      const { score, risk, word, matCount, baseScore } = analyzeConflict(text, chatId);
+      const { score, risk, word, matCount } = analyzeConflict(text, chatId);
       
-      // ✅ ЛОГИРУЕМ ВСЕ В DASHBOARD (даже 0%)
+      // ✅ ЛОГИРУЕМ ВСЕ В DASHBOARD
       try {
         addStat(word || text.slice(0, 30), score);
       } catch (e: unknown) {
-        console.log('⚠️ addStat:', (e as Error).message);  // ✅ TypeScript OK!
+        console.log('⚠️ addStat:', (e as Error).message);
       }
 
-      // 🔥 ТВЁРДОЕ условие: УВЕДОМЛЕНИЯ ТОЛЬКО при МАТЕ > 25!
-      if (score > 25 && baseScore > 0) {
+      // 🔥 ФИНАЛЬНОЕ условие: ТОЛЬКО при НАЙДЕННОМ МАТЕ > 25%
+      if (score > 25 && word) {  // ✅ word = НАЙДЕН МАТ!
         console.log(`⚡ АЛАРМ ${risk}! ${score}% "${text}"`);
         
         const ADMIN_CHAT_ID = 505019574;
