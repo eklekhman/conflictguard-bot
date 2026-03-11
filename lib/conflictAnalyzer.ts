@@ -111,9 +111,6 @@ export function analyze(message: string): AnalysisResult {
     reasons.push(`${word} (+${total})`);
   }
 
-  if (reasons.length === 0) {
-    reasons.push("");  // ПУСТО!
-  }
 
   return { score, risk, reasons };
 }
