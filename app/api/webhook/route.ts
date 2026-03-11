@@ -16,6 +16,7 @@ const MAT_SCORE: { [key: string]: number } = {
   дурак: 25, дурацкий: 25,
   идиот: 50, идиотизм: 50,
   мудак: 60, мудаковатый: 60,
+  сука: 65,  // 🔥 ДОБАВЛЕНО!
   пиздец: 80, блять: 70, хуй: 85,
   нахуй: 95, "пошел нахуй": 100,
   конфликт: 30, война: 40, драка: 50,
@@ -84,15 +85,15 @@ export async function POST(request: NextRequest) {
     if (text) {
       const { score, risk, word, matCount } = analyzeConflict(text, chatId);
       
-      // ✅ ЛОГИРУЕМ ВСЕ В DASHBOARD
+      // ✅ ЛОГИРУЕМ ВСЕ В DASHBOARD (статистика)
       try {
         addStat(word || text.slice(0, 30), score);
       } catch (e: unknown) {
         console.log('⚠️ addStat:', (e as Error).message);
       }
 
-      // 🔥 ФИНАЛЬНОЕ условие: ТОЛЬКО при НАЙДЕННОМ МАТЕ > 25%
-      if (score > 25 && word) {  // ✅ word = НАЙДЕН МАТ!
+      // 🔥 🔥 ТВЁРДОЕ условие: НИКАКИХ АЛЕРТОВ на 0%!
+      if (score > 25 && word && score > 0) {  // ✅ ТРОЙНАЯ ЗАЩИТА!
         console.log(`⚡ АЛАРМ ${risk}! ${score}% "${text}"`);
         
         const ADMIN_CHAT_ID = 505019574;
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
           })
         }).catch(err => console.error('❌ Админ:', err));
       } else {
-        console.log(`✅ OK: ${score}% "${text}" (no action)`);
+        console.log(`✅ OK: ${score}% "${text}" (no alert)`);
       }
     }
 
