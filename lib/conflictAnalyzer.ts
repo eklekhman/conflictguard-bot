@@ -112,7 +112,7 @@ export function analyze(message: string): AnalysisResult {
   }
 
   if (reasons.length === 0) {
-    reasons.push("No toxic triggers detected");
+    reasons.push("");  // ПУСТО!
   }
 
   return { score, risk, reasons };
