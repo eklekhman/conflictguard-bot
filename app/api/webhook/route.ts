@@ -18,11 +18,11 @@ const MAT_SCORE: { [key: string]: number } = {
   мудак: 60, мудаковатый: 60,
   пиздец: 80, блять: 70, хуй: 85,
   нахуй: 95, "пошел нахуй": 100,
-  'конфликт': 30, 'война': 40, 'драка': 50,
+  конфликт: 30, война: 40, драка: 50,
   убью: 90, зарежу: 95, заебал: 75
 };
 
-// 🔥 УЛУЧШЕННАЯ функция анализа (25% порог)
+// 🔥 ИДЕАЛЬНАЯ функция анализа
 function analyzeConflict(text: string, chatId: number): { 
   score: number; risk: string; word?: string; matCount: number 
 } {
@@ -31,35 +31,42 @@ function analyzeConflict(text: string, chatId: number): {
   let matchedWord: string | undefined;
   let matCount = 0;
 
-  // CAPS DETECTION (добавляет риск)
-  const capsRatio = (text.match(/[А-ЯЪЫЬЭ]{3,}/g) || []).length * 15;
-  const exclamations = (text.match(/[!?.]{2,}/g) || []).length * 10;
-
-  // 1. Найди НАИБИЛЬШИЙ мат
+  // 🔥 ТОЧНЫЙ поиск МАТА (полные слова)
   for (const [word, points] of Object.entries(MAT_SCORE)) {
-    if (lower.includes(word)) {
+    // \b = граница слова (точно "дебил", не "дебильный")
+    const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i');
+    if (regex.test(lower)) {
       baseScore = points;
       matchedWord = word;
       break;
     }
   }
 
-  // 2. Подсчет ТОГО ЖЕ слова
+  // Подсчет повторов
   if (matchedWord) {
-    matCount = (lower.match(new RegExp(matchedWord, 'g')) || []).length;
+    matCount = (lower.match(new RegExp(matchedWord, 'gi')) || []).length;
   }
 
-  // 3. 🔥 ФИНАЛЬНЫЙ СКОР: мат + CAPS + !!!!
-  const finalScore = Math.min(baseScore * matCount + capsRatio + exclamations, 100); 
+  // 🔥 Бонусы ТОЛЬКО при мате
+  let bonusScore = 0;
+  if (baseScore > 0) {
+    bonusScore = (text.match(/[А-ЯЪЫЬЭ]{3,}/g) || []).length * 10 + 
+                 (text.match(/[!]{2,}/g) || []).length * 8;
+  }
 
-  console.log(`🔍 "${text}" → ${finalScore}% (${baseScore}×${matCount} + CAPS:${capsRatio} + !:${exclamations})`);
+  const finalScore = Math.min(baseScore * matCount + bonusScore, 100);
 
-  const risk = finalScore > 80 ? "🔥 HIGH" : finalScore > 50 ? "🚨 MEDIUM" : finalScore > 25 ? "⚠️ LOW" : "✅ OK";
+  console.log(`🔍 "${text}" → ${finalScore}% (${matchedWord || 'clean'} ${baseScore > 0 ? `×${matCount} +${bonusScore}` : ''})`);
+
+  const risk = finalScore > 80 ? "🔥 HIGH" : 
+               finalScore > 50 ? "🚨 MEDIUM" : 
+               finalScore > 25 ? "⚠️ LOW" : "✅ OK";
+  
   return { score: finalScore, risk, word: matchedWord, matCount };
 }
 
 export async function POST(request: NextRequest) {
-  console.log("📨 POST /api/webhook 200");
+  console.log("📨 POST /api/webhook");
 
   try {
     const body = await request.json();
@@ -74,17 +81,21 @@ export async function POST(request: NextRequest) {
     history.push({ text, time: Date.now() });
     if (history.length > 20) history.shift();
 
-    console.log(`👤 ${user} [${chatId}]: "${text}" | История: ${history.length}`);
+    console.log(`👤 ${user} [${chatId}]: "${text}"`);
 
     if (text) {
       const { score, risk, word, matCount } = analyzeConflict(text, chatId);
       
-      // 🔥 ЛОГИРУЕМ ВСЕ В DASHBOARD
-      addStat(word || text.slice(0, 30), score);
+      // ✅ ЛОГИРУЕМ ВСЕ В DASHBOARD (даже 0%)
+      try {
+        addStat(word || text.slice(0, 30), score);
+      } catch (e) {
+        console.log('⚠️ addStat:', e.message);
+      }
 
-      // 🔥 УВЕДОМЛЕНИЯ ОТ 25%!
-      if (score > 25) {
-        console.log(`⚡ АЛАРМ ${risk}! "${text}" → ${score}% | ×${matCount}`);
+      // 🔥 ТВЁРДОЕ условие: УВЕДОМЛЕНИЯ ТОЛЬКО > 25!
+      if (score > 25 && baseScore > 0) {  // baseScore > 0 = НАЙДЕН МАТ!
+        console.log(`⚡ АЛАРМ ${risk}! ${score}% "${text}"`);
         
         const ADMIN_CHAT_ID = 505019574;
         const emoji = score > 80 ? "🔥" : score > 50 ? "🚨" : "⚠️";
@@ -94,19 +105,17 @@ export async function POST(request: NextRequest) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: ADMIN_CHAT_ID,
-            text: `${emoji} CONFLICTGUARD | ${risk}\n👤 ${user} [${chatId}]\n💬 "${text}"\n⚡ ${Math.round(score)}% | ${word || 'риск'} ×${matCount}`
+            text: `${emoji} CONFLICTGUARD | ${risk}\n👤 ${user} [${chatId}]\n💬 "${text}"\n⚡ ${Math.round(score)}% | ${word} ×${matCount}`
           })
-        }).catch(err => console.error('❌ Админ уведомление:', err));
-        
-        console.log(`📱 Админ: ${emoji} ${score}% ${risk}`);
+        }).catch(err => console.error('❌ Админ:', err));
       } else {
-        console.log(`✅ OK: ${score}% "${text}"`);
+        console.log(`✅ OK: ${score}% "${text}" (no action)`);
       }
     }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("❌ Webhook ERROR:", error);
+    console.error("❌ ERROR:", error);
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
 }
