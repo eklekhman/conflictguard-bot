@@ -33,7 +33,6 @@ function analyzeConflict(text: string, chatId: number): {
 
   // 🔥 ТОЧНЫЙ поиск МАТА (полные слова)
   for (const [word, points] of Object.entries(MAT_SCORE)) {
-    // \b = граница слова (точно "дебил", не "дебильный")
     const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i');
     if (regex.test(lower)) {
       baseScore = points;
@@ -84,17 +83,17 @@ export async function POST(request: NextRequest) {
     console.log(`👤 ${user} [${chatId}]: "${text}"`);
 
     if (text) {
-      const { score, risk, word, matCount } = analyzeConflict(text, chatId);
+      const { score, risk, word, matCount, baseScore } = analyzeConflict(text, chatId);
       
       // ✅ ЛОГИРУЕМ ВСЕ В DASHBOARD (даже 0%)
       try {
         addStat(word || text.slice(0, 30), score);
-      } catch (e) {
-        console.log('⚠️ addStat:', e.message);
+      } catch (e: unknown) {
+        console.log('⚠️ addStat:', (e as Error).message);  // ✅ TypeScript OK!
       }
 
-      // 🔥 ТВЁРДОЕ условие: УВЕДОМЛЕНИЯ ТОЛЬКО > 25!
-      if (score > 25 && baseScore > 0) {  // baseScore > 0 = НАЙДЕН МАТ!
+      // 🔥 ТВЁРДОЕ условие: УВЕДОМЛЕНИЯ ТОЛЬКО при МАТЕ > 25!
+      if (score > 25 && baseScore > 0) {
         console.log(`⚡ АЛАРМ ${risk}! ${score}% "${text}"`);
         
         const ADMIN_CHAT_ID = 505019574;
