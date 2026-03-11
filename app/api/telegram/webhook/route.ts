@@ -1,14 +1,8 @@
-/**
- * Telegram Webhook: receives updates, runs conflict analysis, stores alerts, notifies managers on HIGH.
- * Node runtime + явный UTF-8 при чтении тела — чтобы кириллица работала на Vercel.
- */
-
 import { NextRequest, NextResponse } from "next/server";
-
-export const runtime = "nodejs";
-import { analyzeMessage } from "@/lib/conflictAnalyzer";
-import { addAlert } from "@/lib/alertsStore";
-import { notifyManagers } from "@/lib/notifications";
+import type { RiskLevel } from "@/lib/conflictAnalyzer";
+import { analyze } from "@/lib/conflictAnalyzer";
+import { insertMessage } from "@/lib/db";
+import { sendManagerAlert, sendRiskSummaryToChat } from "@/lib/telegram";
 
 interface TelegramMessage {
   message_id: number;
@@ -61,6 +55,8 @@ function fixMojibake(str: string): string {
   return str;
 }
 
+export const runtime = "nodejs";
+
 export async function POST(request: NextRequest) {
   try {
     const body = await parseBodyUtf8(request);
@@ -80,29 +76,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    console.log("[ConflictGuard] Text after fix:", JSON.stringify(text), "hasCyrillic:", /[а-яё]/.test(text));
+    console.log(
+      "[ConflictGuard] Text after fix:",
+      JSON.stringify(text),
+      "hasCyrillic:",
+      /[а-яё]/.test(text)
+    );
 
-    const analysis = analyzeMessage(text);
+    const analysis = analyze(text);
 
     console.log("[ConflictGuard] Analysis debug", {
       text,
       analysis,
     });
 
-    const alert = addAlert({
-      chatId: chat.id,
-      chatTitle: chat.title ?? "Private chat",
-      authorId: from?.id ?? 0,
-      authorUsername: from?.username ?? undefined,
-      authorFirstName: from?.first_name ?? undefined,
-      messageText: text,
-      riskScore: analysis.riskScore,
-      riskLevel: analysis.riskLevel,
-      reasons: analysis.reasons,
+    const chatIdStr = String(chat.id);
+    const userIdStr = from?.id ? String(from.id) : null;
+    const username = from?.username ?? null;
+
+    await insertMessage({
+      chatId: chatIdStr,
+      userId: userIdStr,
+      username,
+      text,
+      score: analysis.score,
+      risk: analysis.risk as RiskLevel,
     });
 
-    if (analysis.riskLevel === "HIGH") {
-      await notifyManagers(alert);
+    await sendRiskSummaryToChat(chat.id, analysis);
+
+    if (analysis.score > 70) {
+      await sendManagerAlert({
+        chatId: chat.id,
+        username,
+        text,
+        score: analysis.score,
+        risk: analysis.risk,
+      });
     }
 
     return NextResponse.json({ ok: true });

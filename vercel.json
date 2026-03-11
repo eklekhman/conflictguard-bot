@@ -3,9 +3,14 @@
     "app/api/telegram/webhook/route.ts": {
       "runtime": "nodejs20.x",
       "maxDuration": 30
+    },
+    "app/api/events/route.ts": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 30
     }
   },
   "env": {
+    "NODE_ICU_DATA": "node:full-icu",
     "NODE_OPTIONS": "--enable-source-maps"
   }
 }
