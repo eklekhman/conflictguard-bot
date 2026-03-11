@@ -74,7 +74,8 @@ function analyzeConflict(text: string, chatId: number): {
 
   const wordsList = found.map(f => `${f.word} ×${f.count} (${f.points})`);
 
-  console.log(`🎯 [${chatId}] "${text}" → ${wordScore+b_bonus}/${total}%`);
+  // ✅ ИСПРАВЛЕНО!
+  console.log(`🎯 [${chatId}] "${text}" → ${wordScore + bonus}/${total}%`);
 
   return { score: total, wordScore, risk, words: wordsList, matCount: found.length };
 }
