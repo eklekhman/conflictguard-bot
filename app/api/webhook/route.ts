@@ -16,7 +16,7 @@ const MAT_SCORE: { [key: string]: number } = {
   дурак: 25, дурацкий: 25,
   идиот: 50, идиотизм: 50,
   мудак: 60, мудаковатый: 60,
-  сука: 65,  // 🔥 ДОБАВЛЕНО!
+  сука: 65,
   пиздец: 80, блять: 70, хуй: 85,
   нахуй: 95, "пошел нахуй": 100,
   конфликт: 30, война: 40, драка: 50,
@@ -96,17 +96,29 @@ export async function POST(request: NextRequest) {
       if (score > 25 && word && score > 0) {  // ✅ ТРОЙНАЯ ЗАЩИТА!
         console.log(`⚡ АЛАРМ ${risk}! ${score}% "${text}"`);
         
-        const ADMIN_CHAT_ID = 505019574;
+        // ✅ ✅ ✅ ИСПРАВЛЕНО: используем ENV вместо hardcode!
+        const ADMIN_CHAT_ID = Number(process.env.TELEGRAM_CHAT_ID || "0");
+        if (!ADMIN_CHAT_ID) {
+          console.error("❌ TELEGRAM_CHAT_ID не найден в ENV!");
+          return NextResponse.json({ ok: true });
+        }
+        
+        const token = process.env.TELEGRAM_TOKEN;
+        if (!token) {
+          console.error("❌ TELEGRAM_TOKEN не найден!");
+          return NextResponse.json({ ok: true });
+        }
+        
         const emoji = score > 80 ? "🔥" : score > 50 ? "🚨" : "⚠️";
         
-        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: ADMIN_CHAT_ID,
             text: `${emoji} CONFLICTGUARD | ${risk}\n👤 ${user} [${chatId}]\n💬 "${text}"\n⚡ ${Math.round(score)}% | ${word} ×${matCount}`
           })
-        }).catch(err => console.error('❌ Админ:', err));
+        }).catch(err => console.error('❌ Уведомление:', err));
       } else {
         console.log(`✅ OK: ${score}% "${text}" (no alert)`);
       }
