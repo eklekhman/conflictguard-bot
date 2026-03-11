@@ -75,7 +75,7 @@ export async function insertMessage(log: {
 
   await sql`
     INSERT INTO messages (chat_id, user_id, username, text, score, risk, created_at)
-    VALUES (${log.chatId}, ${log.userId}, ${log.username}, ${log.text}, ${log.score}, ${log.risk}, ${createdAt})
+    VALUES (${log.chatId}, ${log.userId}, ${log.username}, ${log.text}, ${log.score}, ${log.risk}, ${createdAt.toISOString()})
   `;
 }
 
