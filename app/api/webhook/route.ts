@@ -18,15 +18,22 @@ const MAT_SCORE: { [key: string]: number } = {
   мудак: 60, мудаковатый: 60,
   пиздец: 80, блять: 70, хуй: 85,
   нахуй: 95, "пошел нахуй": 100,
+  'конфликт': 30, 'война': 40, 'драка': 50,
+  убью: 90, зарежу: 95, заебал: 75
 };
 
-function analyzeMat(text: string, chatId: number): { 
+// 🔥 УЛУЧШЕННАЯ функция анализа (25% порог)
+function analyzeConflict(text: string, chatId: number): { 
   score: number; risk: string; word?: string; matCount: number 
 } {
   const lower = text.toLowerCase();
   let baseScore = 0;
   let matchedWord: string | undefined;
   let matCount = 0;
+
+  // CAPS DETECTION (добавляет риск)
+  const capsRatio = (text.match(/[А-ЯЪЫЬЭ]{3,}/g) || []).length * 15;
+  const exclamations = (text.match(/[!?.]{2,}/g) || []).length * 10;
 
   // 1. Найди НАИБИЛЬШИЙ мат
   for (const [word, points] of Object.entries(MAT_SCORE)) {
@@ -37,17 +44,17 @@ function analyzeMat(text: string, chatId: number): {
     }
   }
 
-  // 2. Простой подсчет ТОГО ЖЕ слова!
+  // 2. Подсчет ТОГО ЖЕ слова
   if (matchedWord) {
     matCount = (lower.match(new RegExp(matchedWord, 'g')) || []).length;
   }
 
-  // 3. Линейный риск: count × base
-  const finalScore = baseScore * matCount; 
+  // 3. 🔥 ФИНАЛЬНЫЙ СКОР: мат + CAPS + !!!!
+  const finalScore = Math.min(baseScore * matCount + capsRatio + exclamations, 100); 
 
-  console.log(`🔍 "${text}" ×${matCount} → ${finalScore} (${baseScore}×${matCount})`);
+  console.log(`🔍 "${text}" → ${finalScore}% (${baseScore}×${matCount} + CAPS:${capsRatio} + !:${exclamations})`);
 
-  const risk = finalScore > 80 ? "HIGH" : finalScore > 50 ? "MEDIUM" : "LOW";
+  const risk = finalScore > 80 ? "🔥 HIGH" : finalScore > 50 ? "🚨 MEDIUM" : finalScore > 25 ? "⚠️ LOW" : "✅ OK";
   return { score: finalScore, risk, word: matchedWord, matCount };
 }
 
@@ -57,8 +64,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const chatId = Number(body.message?.chat?.id);
-    const user = body.message?.from?.username || "unknown";
+    const user = body.message?.from?.username || body.message?.from?.first_name || "unknown";
     const text = body.message?.text || "";
+    const messageId = body.message?.message_id;
 
     // История чата
     if (!global.chatHistory.has(chatId)) global.chatHistory.set(chatId, []);
@@ -69,26 +77,30 @@ export async function POST(request: NextRequest) {
     console.log(`👤 ${user} [${chatId}]: "${text}" | История: ${history.length}`);
 
     if (text) {
-      const { score, risk, word, matCount } = analyzeMat(text, chatId); // 🔥 matCount!
+      const { score, risk, word, matCount } = analyzeConflict(text, chatId);
       
-      if (score > 0) {
-        console.log(`⚡ АЛАРМ! "${text}" → ${score} ${risk} | ×${matCount}`);
-        addStat(word || text.slice(0, 30), score);
+      // 🔥 ЛОГИРУЕМ ВСЕ В DASHBOARD
+      addStat(word || text.slice(0, 30), score);
+
+      // 🔥 УВЕДОМЛЕНИЯ ОТ 25%!
+      if (score > 25) {
+        console.log(`⚡ АЛАРМ ${risk}! "${text}" → ${score}% | ×${matCount}`);
         
-        // 🚨 УВЕДОМЛЕНИЕ АДМИНУ (только HIGH)
-        if (score > 80) {
-          const ADMIN_CHAT_ID = 505019574;
-          await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: ADMIN_CHAT_ID,
-              text: `🚨 CONFLICTGUARD АЛАРМ!\n👤 ${user} [${chatId}]\n💬 "${text}"\n⚡ РИСК: ${Math.round(score)} ${risk}\n📊 ${word || 'мат'} ×${matCount}` // 🔥 ТОЧНЫЙ count!
-            })
-          }).catch(err => console.error('❌ Админ уведомление:', err));
-          
-          console.log(`📱 Админ уведомлен: ${Math.round(score)} ${risk} ×${matCount}`);
-        }
+        const ADMIN_CHAT_ID = 505019574;
+        const emoji = score > 80 ? "🔥" : score > 50 ? "🚨" : "⚠️";
+        
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: ADMIN_CHAT_ID,
+            text: `${emoji} CONFLICTGUARD | ${risk}\n👤 ${user} [${chatId}]\n💬 "${text}"\n⚡ ${Math.round(score)}% | ${word || 'риск'} ×${matCount}`
+          })
+        }).catch(err => console.error('❌ Админ уведомление:', err));
+        
+        console.log(`📱 Админ: ${emoji} ${score}% ${risk}`);
+      } else {
+        console.log(`✅ OK: ${score}% "${text}"`);
       }
     }
 
