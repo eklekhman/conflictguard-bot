@@ -1,4 +1,4 @@
-#ConflictGuard 🚨
+# ConflictGuard 🚨
 
 
 Real-time Telegram Chat Moderation Bot
@@ -6,7 +6,7 @@ AI-powered profanity, insult & conflict detection for Telegram groups.
 Production ready.
 
 
-###📋 Project Description
+### 📋 Project Description
 
 ConflictGuard monitors Telegram chats **real-time** and detects:
 
@@ -22,7 +22,7 @@ ConflictGuard monitors Telegram chats **real-time** and detects:
 - **HIGH (>75%)** → monitoring + admins
 
 
-###🛠 Tech Stack
+### 🛠 Tech Stack
 - Frontend: **Next.js 14** (App Router) + TypeScript
 - Backend: **Next.js API Routes** (Serverless)
 - **Deployment**: Vercel (zero-config)
@@ -32,7 +32,7 @@ ConflictGuard monitors Telegram chats **real-time** and detects:
 - **Hosting**: Vercel / Cloudflare Workers
 
 
-###🚀 Installation  
+### 🚀 Installation  
 1. **Create Next.js Project**  
 *npx create-next-app@latest conflictguard --typescript --tailwind --app --eslint --no-src-dir*
 *cd conflictguard*
@@ -51,7 +51,7 @@ conflictguard/
 └── README.md  
 
 
-###▶️ Running Locally  
+### ▶️ Running Locally  
 1. **Development Mode**  
 *npm run dev*  
 Available at http://localhost:3000/api/webhook
@@ -64,7 +64,7 @@ Available at http://localhost:3000/api/webhook
 *ngrok http 3000*  
 Use ngrok URL for webhook: https://abc123.ngrok.io/api/webhook
 
-###🌐 Deployment  
+### 🌐 Deployment  
 1.**Vercel (Recommended)**
 *npm i -g vercel*  
 *vercel --prod*
@@ -76,7 +76,7 @@ Use ngrok URL for webhook: https://abc123.ngrok.io/api/webhook
 3.**Verify Webhook**  
 *curl "https://api.telegram.org/bot$TELEGRAM_TOKEN/getWebhookInfo"*
 
-###Usage Examples  
+### Usage Examples  
 
 **1. Basic Setup**  
 1. Add bot to target group as **admin**
@@ -96,12 +96,12 @@ the fool
 ⚠️LOW  
 
 
-##⚙️ Configuration
--**TELEGRAM_TOKEN**	✅	Bot token 
--**TELEGRAM_CHAT_ID**	✅	Monitoring group ID	
--**ADMIN_CHAT_IDS**	✅	Admin user IDs	
+### ⚙️ Configuration  
+- **TELEGRAM_TOKEN**	✅	Bot token 
+- **TELEGRAM_CHAT_ID**	✅	Monitoring group ID	
+- **ADMIN_CHAT_IDS**	✅	Admin user IDs	
 
-📊 Scoring Algorithm
+### 📊 Scoring Algorithm
 1. Tokenize text → ["fool"]
 2. Match dictionary → fool(25) = 25 points
 3. Add bonuses:
@@ -111,51 +111,51 @@ the fool
 **Dictionary (50+ words):**
 
 
-###🔧 Extending the Bot  
+### 🔧 Extending the Bot  
 
-**1. Add New Words**
-*const BAD_WORDS = {*
-  *"new_word": 45,  // Add to dictionary*
-  *"another": 60*
+**1. Add New Words**  
+*const BAD_WORDS = {*  
+  *"new_word": 45,  // Add to dictionary*  
+  *"another": 60*  
 *};*
 
-**2. Database Integration**
-*// lib/stats.ts*
-*export async function addStat(text: string, score: number) {*
-  *await db.conflicts.create({*
-    *data: { text, score, chatId, timestamp: new Date() }*
-  *});*
+**2. Database Integration**  
+*// lib/stats.ts*  
+*export async function addStat(text: string, score: number) {*  
+  *await db.conflicts.create({*  
+    *data: { text, score, chatId, timestamp: new Date() }*  
+  *});*  
 *}*
 
-**3. Custom Thresholds**
-*const LOW_THRESHOLD = 10;  // Instead of 15*
-*const ADMIN_THRESHOLD = 60; // Instead of 75*
+**3. Custom Thresholds**  
+*const LOW_THRESHOLD = 10;  // Instead of 15*  
+*const ADMIN_THRESHOLD = 60; // Instead of 75*  
 
 
-###🧪 Development Workflow
+### 🧪 Development Workflow
 1. Edit route.ts
-2. Test locally
+2. Test locally  
 *npm run dev*
 3. Test webhook with ngrok  
 *curl -X POST "https://api.telegram.org/bot$TOKEN/setWebhook?url=https://ngrok-url.ngrok.io/api/webhook"*
-4. Push & deploy
+4. Push & deploy  
 *git add . && git commit -m "feat: new words" && git push*  
 Vercel auto-deploys!
-5. Update production webhook
+5. Update production webhook  
 *curl -X POST "https://api.telegram.org/bot$TOKEN/setWebhook?url=https://vercel-url/api/webhook"*
 
 
-###🤝 Contributing  
+### 🤝 Contributing  
 - Fork repository
 - Add words/scores to BAD_WORDS
 - Test with npm run dev + ngrok
 - PR with test cases
 
-###📄 License  
+### 📄 License  
 MIT License - Free for commercial use
 
-###👩‍💻 Author  
-**Ekaterina Lehman**
+### 👩‍💻 Author  
+**Ekaterina Lekhman**
 
 
 Applied Linguistics & Text Analytics  
