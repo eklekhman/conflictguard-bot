@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 💬 _${text}_
 ⚡ **${analysis.wordScore} / ${Math.round(analysis.score)}%**
 📊 ${analysis.words.join(", ")}
-💥 **#${riskEmoji}${analysis.risk}**`;
+**${riskEmoji}${analysis.risk}**`;
 
         await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: "POST",
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 💬 _"${text}"_
 ⚡ **${analysis.wordScore} / ${Math.round(analysis.score)}%**
 📊 ${analysis.words.join(", ")}
-💥 **#🔥HIGH**`;
+ **🔥HIGH**`;
 
         for (const adminId of adminIds) {
           await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
